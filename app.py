@@ -27,14 +27,57 @@ st.write(
 )
 
 # --------------------------------------------------
-# LOAD DATA
+# LOAD GENERAL MODEL
 # --------------------------------------------------
 
-train = pd.read_csv("data/train.csv")
-train["date"] = pd.to_datetime(train["date"])
+@st.cache_resource
+def load_model():
+    return joblib.load("general_demand_model.pkl")
 
-# Load general model
-model = joblib.load("general_demand_model.pkl")
+
+model = load_model()
+
+# --------------------------------------------------
+# AVAILABLE STORES AND PRODUCT FAMILIES
+# --------------------------------------------------
+
+stores = list(range(1, 55))
+
+families = [
+    "AUTOMOTIVE",
+    "BABY CARE",
+    "BEAUTY",
+    "BEVERAGES",
+    "BOOKS",
+    "BREAD/BAKERY",
+    "CELEBRATION",
+    "CLEANING",
+    "DAIRY",
+    "DELI",
+    "EGGS",
+    "FROZEN FOODS",
+    "GROCERY I",
+    "GROCERY II",
+    "HARDWARE",
+    "HOME AND KITCHEN I",
+    "HOME AND KITCHEN II",
+    "HOME APPLIANCES",
+    "HOME CARE",
+    "LADIESWEAR",
+    "LAWN AND GARDEN",
+    "LINGERIE",
+    "LIQUOR,WINE,BEER",
+    "MAGAZINES",
+    "MEATS",
+    "PERSONAL CARE",
+    "PET SUPPLIES",
+    "PLAYERS AND ELECTRONICS",
+    "POULTRY",
+    "PREPARED FOODS",
+    "PRODUCE",
+    "SCHOOL AND OFFICE SUPPLIES",
+    "SEAFOOD"
+]
 
 # --------------------------------------------------
 # DATASET INFORMATION
@@ -46,13 +89,10 @@ st.header("📌 Dataset Overview")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Records", f"{len(train):,}")
-col2.metric("Number of Stores", train["store_nbr"].nunique())
-col3.metric("Product Families", train["family"].nunique())
-col4.metric(
-    "Date Range",
-    f"{train['date'].min().year} - {train['date'].max().year}"
-)
+col1.metric("Total Records", "3,000,888")
+col2.metric("Number of Stores", "54")
+col3.metric("Product Families", "33")
+col4.metric("Date Range", "2013 - 2017")
 
 # --------------------------------------------------
 # MODEL INFORMATION
@@ -81,9 +121,9 @@ st.write(
     "predict the expected future demand."
 )
 
-# Get available values
-stores = sorted(train["store_nbr"].unique())
-families = sorted(train["family"].unique())
+# --------------------------------------------------
+# STORE AND PRODUCT FAMILY
+# --------------------------------------------------
 
 col1, col2 = st.columns(2)
 
@@ -98,6 +138,10 @@ with col2:
         "🛒 Select Product Family",
         families
     )
+
+# --------------------------------------------------
+# SALES AND PROMOTION
+# --------------------------------------------------
 
 col1, col2 = st.columns(2)
 
@@ -116,6 +160,10 @@ with col2:
         value=10,
         step=1
     )
+
+# --------------------------------------------------
+# PREDICTION DATE
+# --------------------------------------------------
 
 prediction_date = st.date_input(
     "📅 Prediction Date"
@@ -156,7 +204,6 @@ if st.button("🔮 Predict Future Demand", type="primary"):
 
     try:
 
-        # If model remembers its training columns
         if hasattr(model, "feature_names_in_"):
 
             required_columns = list(model.feature_names_in_)
@@ -166,19 +213,28 @@ if st.button("🔮 Predict Future Demand", type="primary"):
             for col in required_columns:
 
                 if col in input_data.columns:
+
                     final_input[col] = input_data[col].values
 
                 elif col.startswith("family_"):
+
                     family_name = col.replace("family_", "")
+
                     final_input[col] = [
                         1 if family == family_name else 0
                     ]
 
                 else:
+
                     final_input[col] = 0
 
         else:
+
             final_input = input_data
+
+        # --------------------------------------------------
+        # PREDICT
+        # --------------------------------------------------
 
         prediction = model.predict(final_input)[0]
 
@@ -213,7 +269,8 @@ if st.button("🔮 Predict Future Demand", type="primary"):
 
         st.info(
             f"📊 Based on the entered information, "
-            f"the estimated future demand is **{prediction:,.0f} units**."
+            f"the estimated future demand is "
+            f"**{prediction:,.0f} units**."
         )
 
     except Exception as e:
@@ -225,31 +282,34 @@ if st.button("🔮 Predict Future Demand", type="primary"):
         st.code(str(e))
 
 # --------------------------------------------------
-# MONTHLY SALES TREND
+# SALES TREND
 # --------------------------------------------------
 
 st.markdown("---")
 
-st.header("📊 Monthly Sales Trend")
+st.header("📊 Sales Trend")
 
-monthly_sales = (
-    train.groupby(train["date"].dt.month)["sales"]
-    .sum()
+st.write(
+    "The original retail dataset contains daily sales records "
+    "from 2013 to 2017 across 54 stores and 33 product families."
 )
 
-fig, ax = plt.subplots(figsize=(12, 5))
+trend_data = pd.DataFrame({
+    "Year": [2013, 2014, 2015, 2016, 2017],
+    "Dataset Period": [
+        "Jan - Dec",
+        "Jan - Dec",
+        "Jan - Dec",
+        "Jan - Dec",
+        "Jan - Aug"
+    ]
+})
 
-ax.plot(
-    monthly_sales.index,
-    monthly_sales.values,
-    marker="o"
+st.dataframe(
+    trend_data,
+    use_container_width=True,
+    hide_index=True
 )
-
-ax.set_xlabel("Month")
-ax.set_ylabel("Total Sales")
-ax.set_title("Monthly Sales Trend")
-
-st.pyplot(fig)
 
 # --------------------------------------------------
 # MODEL COMPARISON
@@ -305,3 +365,13 @@ ax2.set_title("RMSE Comparison of Machine Learning Models")
 
 st.pyplot(fig2)
 
+# --------------------------------------------------
+# FOOTER
+# --------------------------------------------------
+
+st.markdown("---")
+
+st.caption(
+    "DemandSense | Intelligent Retail Demand Forecasting "
+    "Using Machine Learning"
+)
